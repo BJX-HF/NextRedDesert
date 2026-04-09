@@ -28,6 +28,10 @@ public class AITestProject : ModuleRules
 
 		PublicIncludePaths.AddRange(new string[] {
 			"AITestProject",
+			"AITestProject/CameraDirector",
+			"AITestProject/CameraDirector/Assets",
+			"AITestProject/CameraDirector/Runtime",
+			"AITestProject/CameraDirector/Types",
 			"AITestProject/Variant_Platforming",
 			"AITestProject/Variant_Platforming/Animation",
 			"AITestProject/Variant_Combat",
