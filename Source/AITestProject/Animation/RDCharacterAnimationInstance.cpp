@@ -1,5 +1,4 @@
 ﻿#include "RDCharacterAnimationInstance.h"
-
 #include "Animation/AnimMontage.h"
 #include "AITestProject.h"
 
