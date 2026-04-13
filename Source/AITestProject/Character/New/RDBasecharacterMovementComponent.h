@@ -2,10 +2,10 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/CharacterMovementComponent.h"
-#include "DmcCameraCharacterMovementComponent.generated.h"
+#include "RDBasecharacterMovementComponent.generated.h"
 
 UCLASS()
-class AITESTPROJECT_API UDmcCameraCharacterMovementComponent : public UCharacterMovementComponent
+class AITESTPROJECT_API URDBasecharacterMovementComponent : public UCharacterMovementComponent
 {
 	GENERATED_BODY()
 

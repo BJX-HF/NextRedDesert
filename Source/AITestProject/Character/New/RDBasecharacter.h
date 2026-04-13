@@ -4,7 +4,7 @@
 #include "AbilitySystemInterface.h"
 #include "GameFramework/Character.h"
 #include "InputActionValue.h"
-#include "DmcCameraCharacter.generated.h"
+#include "RDBasecharacter.generated.h"
 
 class UAbilitySystemComponent;
 class UAITestAttributeSet;
@@ -15,7 +15,7 @@ class UInputAction;
 class UInputMappingContext;
 class UPrimitiveComponent;
 class USpringArmComponent;
-class UDmcCameraCharacterMovementComponent;
+class URDBasecharacterMovementComponent;
 class UWallRunSurfaceComponent;
 struct FOnAttributeChangeData;
 
@@ -46,21 +46,21 @@ enum class EWallRunSide : uint8
 };
 
 UENUM(BlueprintType)
-enum class EDmcCustomMovementMode : uint8
+enum class ERDBasecharacterCustomMovementMode : uint8
 {
 	CMOVE_None UMETA(DisplayName = "None"),
 	CMOVE_WallRun UMETA(DisplayName = "Wall Run")
 };
 
 UCLASS()
-class AITESTPROJECT_API ADMCameraCharacter : public ACharacter, public IAbilitySystemInterface
+class AITESTPROJECT_API ARDBasecharacter : public ACharacter, public IAbilitySystemInterface
 {
 	GENERATED_BODY()
 
-	friend class UDmcCameraCharacterMovementComponent;
+	friend class URDBasecharacterMovementComponent;
 
 public:
-	ADMCameraCharacter(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
+	ARDBasecharacter(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 	virtual void Jump() override;
 
@@ -567,7 +567,7 @@ protected:
 	void ClearWallRunState();
 	void SetWallJumpTriggered(bool bNewTriggered);
 	void DebugWallRunMessage(const FString& Message, const FColor& Color = FColor::Yellow) const;
-	UDmcCameraCharacterMovementComponent* GetDmcMovementComponent() const;
+	URDBasecharacterMovementComponent* GetRDBasecharacterMovementComponent() const;
 
 	void UpdateCameraSystem(float DeltaSeconds);
 	void UpdateSlide(float DeltaSeconds);

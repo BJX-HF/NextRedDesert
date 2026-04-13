@@ -1,8 +1,8 @@
-#include "DmcCameraCharacter.h"
+#include "RDBasecharacter.h"
 
 #include "AbilitySystemComponent.h"
 #include "Camera/CameraComponent.h"
-#include "Character/New/DmcCameraCharacterMovementComponent.h"
+#include "Character/New/RDBasecharacterMovementComponent.h"
 #include "Character/New/WallRunSurfaceComponent.h"
 #include "Components/BoxComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -24,8 +24,8 @@
 
 //测试修改git
 
-ADMCameraCharacter::ADMCameraCharacter(const FObjectInitializer& ObjectInitializer)
-	: Super(ObjectInitializer.SetDefaultSubobjectClass<UDmcCameraCharacterMovementComponent>(ACharacter::CharacterMovementComponentName))
+ARDBasecharacter::ARDBasecharacter(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer.SetDefaultSubobjectClass<URDBasecharacterMovementComponent>(ACharacter::CharacterMovementComponentName))
 {
 	PrimaryActorTick.bCanEverTick = true;
 
@@ -87,12 +87,12 @@ ADMCameraCharacter::ADMCameraCharacter(const FObjectInitializer& ObjectInitializ
 	DefaultMaxWalkSpeed = GetCharacterMovement()->MaxWalkSpeed;
 }
 
-UAbilitySystemComponent* ADMCameraCharacter::GetAbilitySystemComponent() const
+UAbilitySystemComponent* ARDBasecharacter::GetAbilitySystemComponent() const
 {
 	return AbilitySystemComponent;
 }
 
-void ADMCameraCharacter::Jump()
+void ARDBasecharacter::Jump()
 {
 	LastJumpPressedTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
 
@@ -106,7 +106,7 @@ void ADMCameraCharacter::Jump()
 	Super::Jump();
 }
 
-void ADMCameraCharacter::BeginPlay()
+void ARDBasecharacter::BeginPlay()
 {
 	Super::BeginPlay();
 
@@ -120,8 +120,8 @@ void ADMCameraCharacter::BeginPlay()
 
 	if (WallRunDetector)
 	{
-		WallRunDetector->OnComponentBeginOverlap.AddDynamic(this, &ADMCameraCharacter::OnWallRunDetectorBeginOverlap);
-		WallRunDetector->OnComponentEndOverlap.AddDynamic(this, &ADMCameraCharacter::OnWallRunDetectorEndOverlap);
+		WallRunDetector->OnComponentBeginOverlap.AddDynamic(this, &ARDBasecharacter::OnWallRunDetectorBeginOverlap);
+		WallRunDetector->OnComponentEndOverlap.AddDynamic(this, &ARDBasecharacter::OnWallRunDetectorEndOverlap);
 	}
 
 	if (APlayerController* PC = Cast<APlayerController>(GetController()))
@@ -142,13 +142,13 @@ void ADMCameraCharacter::BeginPlay()
 	}
 }
 
-void ADMCameraCharacter::PossessedBy(AController* NewController)
+void ARDBasecharacter::PossessedBy(AController* NewController)
 {
 	Super::PossessedBy(NewController);
 	InitializeAbilitySystem();
 }
 
-void ADMCameraCharacter::Tick(float DeltaSeconds)
+void ARDBasecharacter::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 
@@ -169,7 +169,7 @@ void ADMCameraCharacter::Tick(float DeltaSeconds)
 	UpdateCameraSystem(DeltaSeconds);
 }
 
-void ADMCameraCharacter::Landed(const FHitResult& Hit)
+void ARDBasecharacter::Landed(const FHitResult& Hit)
 {
 	if (bIsWallRunning)
 	{
@@ -182,7 +182,7 @@ void ADMCameraCharacter::Landed(const FHitResult& Hit)
 	Super::Landed(Hit);
 }
 
-void ADMCameraCharacter::OnMovementModeChanged(EMovementMode PrevMovementMode, uint8 PreviousCustomMode)
+void ARDBasecharacter::OnMovementModeChanged(EMovementMode PrevMovementMode, uint8 PreviousCustomMode)
 {
 	Super::OnMovementModeChanged(PrevMovementMode, PreviousCustomMode);
 
@@ -194,13 +194,13 @@ void ADMCameraCharacter::OnMovementModeChanged(EMovementMode PrevMovementMode, u
 		return;
 	}
 
-	if (PrevMovementMode == MOVE_Custom && PreviousCustomMode == static_cast<uint8>(EDmcCustomMovementMode::CMOVE_WallRun))
+	if (PrevMovementMode == MOVE_Custom && PreviousCustomMode == static_cast<uint8>(ERDBasecharacterCustomMovementMode::CMOVE_WallRun))
 	{
 		ClearWallRunState();
 	}
 }
 
-void ADMCameraCharacter::InitializeAbilitySystem()
+void ARDBasecharacter::InitializeAbilitySystem()
 {
 	if (!AbilitySystemComponent || !AttributeSet)
 	{
@@ -209,7 +209,7 @@ void ADMCameraCharacter::InitializeAbilitySystem()
 
 	AbilitySystemComponent->InitAbilityActorInfo(this, this);
 	AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(UAITestAttributeSet::GetHealthAttribute()).RemoveAll(this);
-	AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(UAITestAttributeSet::GetHealthAttribute()).AddUObject(this, &ADMCameraCharacter::HandleHealthChanged);
+	AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(UAITestAttributeSet::GetHealthAttribute()).AddUObject(this, &ARDBasecharacter::HandleHealthChanged);
 	AbilitySystemComponent->SetNumericAttributeBase(UAITestAttributeSet::GetMaxHealthAttribute(), MaxHealth);
 	AbilitySystemComponent->SetNumericAttributeBase(UAITestAttributeSet::GetHealthAttribute(), MaxHealth);
 
@@ -217,7 +217,7 @@ void ADMCameraCharacter::InitializeAbilitySystem()
 	GrantStartupAbilities();
 }
 
-void ADMCameraCharacter::GrantStartupAbilities()
+void ARDBasecharacter::GrantStartupAbilities()
 {
 	if (!AbilitySystemComponent || bStartupAbilitiesGranted || !HasAuthority())
 	{
@@ -235,12 +235,12 @@ void ADMCameraCharacter::GrantStartupAbilities()
 	bStartupAbilitiesGranted = true;
 }
 
-void ADMCameraCharacter::HandleHealthChanged(const FOnAttributeChangeData& ChangeData)
+void ARDBasecharacter::HandleHealthChanged(const FOnAttributeChangeData& ChangeData)
 {
 	CurrentHealth = ChangeData.NewValue;
 }
 
-void ADMCameraCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
+void ARDBasecharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
 
@@ -248,38 +248,38 @@ void ADMCameraCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
 	{
 		if (MoveAction)
 		{
-			EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &ADMCameraCharacter::Move);
+			EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &ARDBasecharacter::Move);
 		}
 
 		if (LookAction)
 		{
-			EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &ADMCameraCharacter::Look);
+			EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &ARDBasecharacter::Look);
 		}
 
 		if (JumpAction)
 		{
-			EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &ADMCameraCharacter::StartJump);
-			EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &ADMCameraCharacter::StopJump);
+			EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &ARDBasecharacter::StartJump);
+			EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &ARDBasecharacter::StopJump);
 		}
 
 		if (LockOnAction)
 		{
-			EnhancedInputComponent->BindAction(LockOnAction, ETriggerEvent::Started, this, &ADMCameraCharacter::ToggleLockOn);
+			EnhancedInputComponent->BindAction(LockOnAction, ETriggerEvent::Started, this, &ARDBasecharacter::ToggleLockOn);
 		}
 
 		if (SlideAction)
 		{
-			EnhancedInputComponent->BindAction(SlideAction, ETriggerEvent::Started, this, &ADMCameraCharacter::HandleSlideInput);
+			EnhancedInputComponent->BindAction(SlideAction, ETriggerEvent::Started, this, &ARDBasecharacter::HandleSlideInput);
 		}
 
 		if (SwitchTargetAction)
 		{
-			EnhancedInputComponent->BindAction(SwitchTargetAction, ETriggerEvent::Triggered, this, &ADMCameraCharacter::SwitchTarget);
+			EnhancedInputComponent->BindAction(SwitchTargetAction, ETriggerEvent::Triggered, this, &ARDBasecharacter::SwitchTarget);
 		}
 	}
 }
 
-void ADMCameraCharacter::Move(const FInputActionValue& Value)
+void ARDBasecharacter::Move(const FInputActionValue& Value)
 {
 	const FVector2D MovementVector = Value.Get<FVector2D>();
 	if (!Controller) return;
@@ -311,7 +311,7 @@ void ADMCameraCharacter::Move(const FInputActionValue& Value)
 	}
 }
 
-void ADMCameraCharacter::Look(const FInputActionValue& Value)
+void ARDBasecharacter::Look(const FInputActionValue& Value)
 {
 	const FVector2D LookAxisVector = Value.Get<FVector2D>();
 	if (!Controller) return;
@@ -337,7 +337,7 @@ void ADMCameraCharacter::Look(const FInputActionValue& Value)
 	}
 }
 
-void ADMCameraCharacter::StartJump(const FInputActionValue& Value)
+void ARDBasecharacter::StartJump(const FInputActionValue& Value)
 {
 	if (bIsSliding)
 	{
@@ -347,19 +347,19 @@ void ADMCameraCharacter::StartJump(const FInputActionValue& Value)
 	Jump();
 }
 
-void ADMCameraCharacter::StopJump(const FInputActionValue& Value)
+void ARDBasecharacter::StopJump(const FInputActionValue& Value)
 {
 	StopJumping();
 }
 
-void ADMCameraCharacter::HandleSlideInput(const FInputActionValue& Value)
+void ARDBasecharacter::HandleSlideInput(const FInputActionValue& Value)
 {
 	bHasSlideInputQueued = true;
 	StartSlide();
 	bHasSlideInputQueued = false;
 }
 
-void ADMCameraCharacter::ToggleLockOn(const FInputActionValue& Value)
+void ARDBasecharacter::ToggleLockOn(const FInputActionValue& Value)
 {
 	if (CurrentLockTarget)
 	{
@@ -373,7 +373,7 @@ void ADMCameraCharacter::ToggleLockOn(const FInputActionValue& Value)
 	}
 }
 
-void ADMCameraCharacter::SwitchTarget(const FInputActionValue& Value)
+void ARDBasecharacter::SwitchTarget(const FInputActionValue& Value)
 {
 	if (!CurrentLockTarget || CameraState != ECombatCameraState::LockOn || TargetSwitchCooldown > 0.f)
 	{
@@ -397,7 +397,7 @@ void ADMCameraCharacter::SwitchTarget(const FInputActionValue& Value)
 	}
 }
 
-bool ADMCameraCharacter::StartSlide()
+bool ARDBasecharacter::StartSlide()
 {
 	if (!CanStartSlide())
 	{
@@ -440,7 +440,7 @@ bool ADMCameraCharacter::StartSlide()
 	return true;
 }
 
-void ADMCameraCharacter::StopSlide()
+void ARDBasecharacter::StopSlide()
 {
 	if (!bIsSliding)
 	{
@@ -465,7 +465,7 @@ void ADMCameraCharacter::StopSlide()
 	}
 }
 
-void ADMCameraCharacter::UpdateWallRunState(float DeltaSeconds)
+void ARDBasecharacter::UpdateWallRunState(float DeltaSeconds)
 {
 	const bool bShouldClearWallJumpRequestAtEnd = bWallJumpRequested && !bIsWallRunning;
 
@@ -511,7 +511,7 @@ void ADMCameraCharacter::UpdateWallRunState(float DeltaSeconds)
 	}
 }
 
-bool ADMCameraCharacter::TryStartWallRun()
+bool ARDBasecharacter::TryStartWallRun()
 {
 	if (UWallRunSurfaceComponent* Surface = FindBestWallRunSurface())
 	{
@@ -529,7 +529,7 @@ bool ADMCameraCharacter::TryStartWallRun()
 	return false;
 }
 
-bool ADMCameraCharacter::CanStartWallRunOnSurface(UWallRunSurfaceComponent* Surface) const
+bool ARDBasecharacter::CanStartWallRunOnSurface(UWallRunSurfaceComponent* Surface) const
 {
 	const UCharacterMovementComponent* MovementComponent = GetCharacterMovement();
 	if (!MovementComponent || !Surface || bIsWallRunning || bIsSliding)
@@ -601,7 +601,7 @@ bool ADMCameraCharacter::CanStartWallRunOnSurface(UWallRunSurfaceComponent* Surf
 	return true;
 }
 
-UWallRunSurfaceComponent* ADMCameraCharacter::FindBestWallRunSurface() const
+UWallRunSurfaceComponent* ARDBasecharacter::FindBestWallRunSurface() const
 {
 	const FVector HorizontalVelocity = FVector(GetVelocity().X, GetVelocity().Y, 0.f).GetSafeNormal();
 
@@ -638,7 +638,7 @@ UWallRunSurfaceComponent* ADMCameraCharacter::FindBestWallRunSurface() const
 	return BestSurface;
 }
 
-void ADMCameraCharacter::StartWallRun(UWallRunSurfaceComponent* Surface)
+void ARDBasecharacter::StartWallRun(UWallRunSurfaceComponent* Surface)
 {
 	UCharacterMovementComponent* MovementComponent = GetCharacterMovement();
 	if (!MovementComponent || !Surface)
@@ -659,11 +659,11 @@ void ADMCameraCharacter::StartWallRun(UWallRunSurfaceComponent* Surface)
 
 	const float StartSpeed = FMath::Max(MinSpeedToMaintainWallRun, FVector(GetVelocity().X, GetVelocity().Y, 0.f).Size());
 	MovementComponent->Velocity = CurrentWallRunDirection * StartSpeed + FVector(0.f, 0.f, FMath::Max(GetVelocity().Z, 0.f));
-	MovementComponent->SetMovementMode(MOVE_Custom, static_cast<uint8>(EDmcCustomMovementMode::CMOVE_WallRun));
+	MovementComponent->SetMovementMode(MOVE_Custom, static_cast<uint8>(ERDBasecharacterCustomMovementMode::CMOVE_WallRun));
 	MovementComponent->bOrientRotationToMovement = false;
 }
 
-void ADMCameraCharacter::StopWallRun(bool bLaunchAway)
+void ARDBasecharacter::StopWallRun(bool bLaunchAway)
 {
 	UCharacterMovementComponent* MovementComponent = GetCharacterMovement();
 	if (!MovementComponent)
@@ -687,7 +687,7 @@ void ADMCameraCharacter::StopWallRun(bool bLaunchAway)
 	}
 }
 
-void ADMCameraCharacter::PerformWallJump()
+void ARDBasecharacter::PerformWallJump()
 {
 	if (!CanPerformWallJump())
 	{
@@ -708,7 +708,7 @@ void ADMCameraCharacter::PerformWallJump()
 	SetWallJumpTriggered(true);
 }
 
-void ADMCameraCharacter::OnWallRunDetectorBeginOverlap(
+void ARDBasecharacter::OnWallRunDetectorBeginOverlap(
 	UPrimitiveComponent* OverlappedComponent,
 	AActor* OtherActor,
 	UPrimitiveComponent* OtherComp,
@@ -751,7 +751,7 @@ void ADMCameraCharacter::OnWallRunDetectorBeginOverlap(
 	AddOverlappingWallRunSurface(Surface);
 }
 
-void ADMCameraCharacter::OnWallRunDetectorEndOverlap(
+void ARDBasecharacter::OnWallRunDetectorEndOverlap(
 	UPrimitiveComponent* OverlappedComponent,
 	AActor* OtherActor,
 	UPrimitiveComponent* OtherComp,
@@ -770,7 +770,7 @@ void ADMCameraCharacter::OnWallRunDetectorEndOverlap(
 	RemoveOverlappingWallRunSurface(Surface);
 }
 
-void ADMCameraCharacter::AddOverlappingWallRunSurface(UWallRunSurfaceComponent* Surface)
+void ARDBasecharacter::AddOverlappingWallRunSurface(UWallRunSurfaceComponent* Surface)
 {
 	if (!Surface)
 	{
@@ -788,7 +788,7 @@ void ADMCameraCharacter::AddOverlappingWallRunSurface(UWallRunSurfaceComponent* 
 	OverlappingWallRunSurfaces.Add(Surface);
 }
 
-void ADMCameraCharacter::RemoveOverlappingWallRunSurface(UWallRunSurfaceComponent* Surface)
+void ARDBasecharacter::RemoveOverlappingWallRunSurface(UWallRunSurfaceComponent* Surface)
 {
 	OverlappingWallRunSurfaces.RemoveAll([Surface](const TWeakObjectPtr<UWallRunSurfaceComponent>& SurfacePtr)
 	{
@@ -796,7 +796,7 @@ void ADMCameraCharacter::RemoveOverlappingWallRunSurface(UWallRunSurfaceComponen
 	});
 }
 
-bool ADMCameraCharacter::HasOverlappingWallRunSurface(UWallRunSurfaceComponent* Surface) const
+bool ARDBasecharacter::HasOverlappingWallRunSurface(UWallRunSurfaceComponent* Surface) const
 {
 	if (!Surface)
 	{
@@ -814,7 +814,7 @@ bool ADMCameraCharacter::HasOverlappingWallRunSurface(UWallRunSurfaceComponent* 
 	return false;
 }
 
-void ADMCameraCharacter::CleanupInvalidWallRunSurfaces()
+void ARDBasecharacter::CleanupInvalidWallRunSurfaces()
 {
 	OverlappingWallRunSurfaces.RemoveAll([](const TWeakObjectPtr<UWallRunSurfaceComponent>& SurfacePtr)
 	{
@@ -822,7 +822,7 @@ void ADMCameraCharacter::CleanupInvalidWallRunSurfaces()
 	});
 }
 
-FVector ADMCameraCharacter::ComputeWallRunDirection(const FVector& WallNormal, const FVector& ReferenceDirection) const
+FVector ARDBasecharacter::ComputeWallRunDirection(const FVector& WallNormal, const FVector& ReferenceDirection) const
 {
 	const FVector HorizontalWallNormal = FVector(WallNormal.X, WallNormal.Y, 0.f).GetSafeNormal();
 	FVector AlongWall = FVector::CrossProduct(FVector::UpVector, HorizontalWallNormal).GetSafeNormal();
@@ -845,7 +845,7 @@ FVector ADMCameraCharacter::ComputeWallRunDirection(const FVector& WallNormal, c
 	return AlongWall;
 }
 
-EWallRunSide ADMCameraCharacter::DetermineWallRunSide(const UWallRunSurfaceComponent* Surface, const FVector& WallRunDirection) const
+EWallRunSide ARDBasecharacter::DetermineWallRunSide(const UWallRunSurfaceComponent* Surface, const FVector& WallRunDirection) const
 {
 	if (!Surface)
 	{
@@ -863,13 +863,13 @@ EWallRunSide ADMCameraCharacter::DetermineWallRunSide(const UWallRunSurfaceCompo
 	return CrossZ >= 0.f ? EWallRunSide::Right : EWallRunSide::Left;
 }
 
-float ADMCameraCharacter::GetWallAngleFromUpDeg(const FVector& WallNormal) const
+float ARDBasecharacter::GetWallAngleFromUpDeg(const FVector& WallNormal) const
 {
 	const float Dot = FVector::DotProduct(WallNormal.GetSafeNormal(), FVector::UpVector);
 	return FMath::RadiansToDegrees(FMath::Acos(FMath::Clamp(Dot, -1.f, 1.f)));
 }
 
-float ADMCameraCharacter::GetWallApproachAngleDeg(const FVector& WallNormal) const
+float ARDBasecharacter::GetWallApproachAngleDeg(const FVector& WallNormal) const
 {
 	const FVector HorizontalForward = GetActorForwardVector().GetSafeNormal2D();
 	if (HorizontalForward.IsNearlyZero())
@@ -887,7 +887,7 @@ float ADMCameraCharacter::GetWallApproachAngleDeg(const FVector& WallNormal) con
 	return FMath::RadiansToDegrees(FMath::Acos(FMath::Clamp(Dot, -1.f, 1.f)));
 }
 
-bool ADMCameraCharacter::CanPerformWallJump() const
+bool ARDBasecharacter::CanPerformWallJump() const
 {
 	return bEnableWallJump
 		&& bIsWallRunning
@@ -897,29 +897,29 @@ bool ADMCameraCharacter::CanPerformWallJump() const
 		&& !CurrentWallRunDirection.IsNearlyZero();
 }
 
-float ADMCameraCharacter::GetWallRunTargetSpeed() const
+float ARDBasecharacter::GetWallRunTargetSpeed() const
 {
 	return CurrentWallRunSurface.IsValid()
 		? CurrentWallRunSurface->ResolveWallRunSpeed(WallRunSpeed)
 		: WallRunSpeed;
 }
 
-float ADMCameraCharacter::GetWallRunMaxDurationForCurrentSurface() const
+float ARDBasecharacter::GetWallRunMaxDurationForCurrentSurface() const
 {
 	return CurrentWallRunSurface.IsValid()
 		? CurrentWallRunSurface->ResolveWallRunMaxDuration(WallRunMaxDuration)
 		: WallRunMaxDuration;
 }
 
-bool ADMCameraCharacter::IsWallRunMovementMode() const
+bool ARDBasecharacter::IsWallRunMovementMode() const
 {
 	const UCharacterMovementComponent* MovementComponent = GetCharacterMovement();
 	return MovementComponent
 		&& MovementComponent->MovementMode == MOVE_Custom
-		&& MovementComponent->CustomMovementMode == static_cast<uint8>(EDmcCustomMovementMode::CMOVE_WallRun);
+		&& MovementComponent->CustomMovementMode == static_cast<uint8>(ERDBasecharacterCustomMovementMode::CMOVE_WallRun);
 }
 
-void ADMCameraCharacter::ClearWallRunState()
+void ARDBasecharacter::ClearWallRunState()
 {
 	bIsWallRunning = false;
 	CurrentWallNormal = FVector::ZeroVector;
@@ -929,7 +929,7 @@ void ADMCameraCharacter::ClearWallRunState()
 	WallRunLastWallContactTime = -1000.f;
 }
 
-void ADMCameraCharacter::SetWallJumpTriggered(bool bNewTriggered)
+void ARDBasecharacter::SetWallJumpTriggered(bool bNewTriggered)
 {
 	bWallJumpTriggered = bNewTriggered;
 	WallJumpAnimFlagRemaining = bNewTriggered ? WallJumpAnimFlagDuration : 0.f;
@@ -939,7 +939,7 @@ void ADMCameraCharacter::SetWallJumpTriggered(bool bNewTriggered)
 	}
 }
 
-void ADMCameraCharacter::DebugWallRunMessage(const FString& Message, const FColor& Color) const
+void ARDBasecharacter::DebugWallRunMessage(const FString& Message, const FColor& Color) const
 {
 	if (!bDebugWallRun || !GetWorld())
 	{
@@ -961,12 +961,12 @@ void ADMCameraCharacter::DebugWallRunMessage(const FString& Message, const FColo
 	}
 }
 
-UDmcCameraCharacterMovementComponent* ADMCameraCharacter::GetDmcMovementComponent() const
+URDBasecharacterMovementComponent* ARDBasecharacter::GetRDBasecharacterMovementComponent() const
 {
-	return Cast<UDmcCameraCharacterMovementComponent>(GetCharacterMovement());
+	return Cast<URDBasecharacterMovementComponent>(GetCharacterMovement());
 }
 
-void ADMCameraCharacter::UpdateCameraSystem(float DeltaSeconds)
+void ARDBasecharacter::UpdateCameraSystem(float DeltaSeconds)
 {
 	UpdateCameraState(DeltaSeconds);
 	SolveDesiredCamera(DeltaSeconds);
@@ -974,7 +974,7 @@ void ADMCameraCharacter::UpdateCameraSystem(float DeltaSeconds)
 	UpdateCharacterFacing(DeltaSeconds);
 }
 
-void ADMCameraCharacter::UpdateSlide(float DeltaSeconds)
+void ARDBasecharacter::UpdateSlide(float DeltaSeconds)
 {
 	UCharacterMovementComponent* MovementComponent = GetCharacterMovement();
 	if (!MovementComponent)
@@ -1026,7 +1026,7 @@ void ADMCameraCharacter::UpdateSlide(float DeltaSeconds)
 	}
 }
 
-void ADMCameraCharacter::UpdateCameraState(float DeltaSeconds)
+void ARDBasecharacter::UpdateCameraState(float DeltaSeconds)
 {
 	if (CurrentLockTarget && !IsValidLockTarget(CurrentLockTarget))
 	{
@@ -1049,7 +1049,7 @@ void ADMCameraCharacter::UpdateCameraState(float DeltaSeconds)
 	CameraState = HasNearbyCombatTarget() ? ECombatCameraState::CombatFree : ECombatCameraState::Explore;
 }
 
-void ADMCameraCharacter::SolveDesiredCamera(float DeltaSeconds)
+void ARDBasecharacter::SolveDesiredCamera(float DeltaSeconds)
 {
 	APlayerController* PC = Cast<APlayerController>(Controller);
 	if (!PC) return;
@@ -1132,7 +1132,7 @@ void ADMCameraCharacter::SolveDesiredCamera(float DeltaSeconds)
 	DesiredControlRotation = FRotator(DesiredPitch, DesiredYaw, 0.f);
 }
 
-void ADMCameraCharacter::ApplyCamera(float DeltaSeconds)
+void ARDBasecharacter::ApplyCamera(float DeltaSeconds)
 {
 	APlayerController* PC = Cast<APlayerController>(Controller);
 	if (!PC) return;
@@ -1177,7 +1177,7 @@ void ADMCameraCharacter::ApplyCamera(float DeltaSeconds)
 	FollowCamera->SetFieldOfView(NewFOV);
 }
 
-void ADMCameraCharacter::UpdateCharacterFacing(float DeltaSeconds)
+void ARDBasecharacter::UpdateCharacterFacing(float DeltaSeconds)
 {
 	if (bIsWallRunning)
 	{
@@ -1225,7 +1225,7 @@ void ADMCameraCharacter::UpdateCharacterFacing(float DeltaSeconds)
 	}
 }
 
-bool ADMCameraCharacter::CanStartSlide() const
+bool ARDBasecharacter::CanStartSlide() const
 {
 	if (!bSlideEnabled)
 	{
@@ -1247,88 +1247,88 @@ bool ADMCameraCharacter::CanStartSlide() const
 	return bCanSlideFromStandingStill || CurrentHorizontalSpeed >= SlideTriggerMinSpeed;
 }
 
-float ADMCameraCharacter::GetClampedSlideCapsuleHalfHeight() const
+float ARDBasecharacter::GetClampedSlideCapsuleHalfHeight() const
 {
 	const float CapsuleRadius = GetCapsuleComponent() ? GetCapsuleComponent()->GetUnscaledCapsuleRadius() : 0.f;
 	return FMath::Max(SlideCapsuleHalfHeight, CapsuleRadius + 1.f);
 }
 
-float ADMCameraCharacter::GetHorizontalSpeed() const
+float ARDBasecharacter::GetHorizontalSpeed() const
 {
 	return HorizontalSpeed;
 }
 
-FVector ADMCameraCharacter::GetSlideDirection() const
+FVector ARDBasecharacter::GetSlideDirection() const
 {
 	return SlideDirection;
 }
 
-bool ADMCameraCharacter::IsWallRunning() const
+bool ARDBasecharacter::IsWallRunning() const
 {
 	return bIsWallRunning;
 }
 
-bool ADMCameraCharacter::IsWallJumping() const
+bool ARDBasecharacter::IsWallJumping() const
 {
 	return bWallJumpTriggered;
 }
 
-bool ADMCameraCharacter::WasWallJumpRequestedThisFrame() const
+bool ARDBasecharacter::WasWallJumpRequestedThisFrame() const
 {
 	return bWallJumpRequested;
 }
 
-EWallRunSide ADMCameraCharacter::GetWallJumpSide() const
+EWallRunSide ARDBasecharacter::GetWallJumpSide() const
 {
 	return LastWallJumpSide;
 }
 
-EWallRunSide ADMCameraCharacter::GetWallRunSide() const
+EWallRunSide ARDBasecharacter::GetWallRunSide() const
 {
 	return CurrentWallRunSide;
 }
 
-bool ADMCameraCharacter::IsWallRunningOnLeft() const
+bool ARDBasecharacter::IsWallRunningOnLeft() const
 {
 	return bIsWallRunning && CurrentWallRunSide == EWallRunSide::Left;
 }
 
-bool ADMCameraCharacter::IsWallRunningOnRight() const
+bool ARDBasecharacter::IsWallRunningOnRight() const
 {
 	return bIsWallRunning && CurrentWallRunSide == EWallRunSide::Right;
 }
 
-bool ADMCameraCharacter::IsWallJumpFromLeft() const
+bool ARDBasecharacter::IsWallJumpFromLeft() const
 {
 	return bWallJumpTriggered && LastWallJumpSide == EWallRunSide::Left;
 }
 
-bool ADMCameraCharacter::IsWallJumpFromRight() const
+bool ARDBasecharacter::IsWallJumpFromRight() const
 {
 	return bWallJumpTriggered && LastWallJumpSide == EWallRunSide::Right;
 }
 
-FVector ADMCameraCharacter::GetWallRunDirection() const
+FVector ARDBasecharacter::GetWallRunDirection() const
 {
 	return CurrentWallRunDirection;
 }
 
-FVector ADMCameraCharacter::GetWallNormal() const
+FVector ARDBasecharacter::GetWallNormal() const
 {
 	return CurrentWallNormal;
 }
 
-float ADMCameraCharacter::GetWallRunSpeed() const
+float ARDBasecharacter::GetWallRunSpeed() const
 {
 	return FMath::Abs(FVector::DotProduct(GetVelocity(), CurrentWallRunDirection.GetSafeNormal()));
 }
 
-bool ADMCameraCharacter::HasNearbyCombatTarget() const
+bool ARDBasecharacter::HasNearbyCombatTarget() const
 {
 	return GatherCandidateTargets(CombatDetectRadius).Num() > 0;
 }
 
-bool ADMCameraCharacter::IsValidLockTarget(AActor* Actor) const
+bool ARDBasecharacter::IsValidLockTarget(AActor* Actor) const
 {
 	if (!Actor || Actor == this || Actor->IsPendingKillPending() || !Actor->ActorHasTag(LockTargetTag))
 	{
@@ -1346,7 +1346,7 @@ bool ADMCameraCharacter::IsValidLockTarget(AActor* Actor) const
 	return FMath::Abs(TargetPivot.Z - PlayerPivot.Z) <= MaxLockVerticalDelta;
 }
 
-TArray<AActor*> ADMCameraCharacter::GatherCandidateTargets(float Radius) const
+TArray<AActor*> ARDBasecharacter::GatherCandidateTargets(float Radius) const
 {
 	TArray<AActor*> Results;
 	if (!GetWorld()) return Results;
@@ -1382,7 +1382,7 @@ TArray<AActor*> ADMCameraCharacter::GatherCandidateTargets(float Radius) const
 	return Results;
 }
 
-AActor* ADMCameraCharacter::FindBestLockTarget() const
+AActor* ARDBasecharacter::FindBestLockTarget() const
 {
 	TArray<AActor*> Candidates = GatherCandidateTargets(LockAcquireRadius);
 	if (Candidates.IsEmpty()) return nullptr;
@@ -1419,7 +1419,7 @@ AActor* ADMCameraCharacter::FindBestLockTarget() const
 	return BestTarget;
 }
 
-AActor* ADMCameraCharacter::FindSwitchTarget(float DirectionSign) const
+AActor* ARDBasecharacter::FindSwitchTarget(float DirectionSign) const
 {
 	TArray<AActor*> Candidates = GatherCandidateTargets(LockAcquireRadius);
 	if (Candidates.IsEmpty() || !CurrentLockTarget) return nullptr;
@@ -1462,7 +1462,7 @@ AActor* ADMCameraCharacter::FindSwitchTarget(float DirectionSign) const
 	return BestTarget ? BestTarget : CurrentLockTarget.Get();
 }
 
-ELockOnZone ADMCameraCharacter::ComputeLockZone(float TargetYawDeg) const
+ELockOnZone ARDBasecharacter::ComputeLockZone(float TargetYawDeg) const
 {
 	APlayerController* PC = Cast<APlayerController>(Controller);
 	if (!PC) return ELockOnZone::Center;
@@ -1476,7 +1476,7 @@ ELockOnZone ADMCameraCharacter::ComputeLockZone(float TargetYawDeg) const
 	return ELockOnZone::Offscreen;
 }
 
-float ADMCameraCharacter::GetRotationInterpSpeedForZone(ELockOnZone Zone) const
+float ARDBasecharacter::GetRotationInterpSpeedForZone(ELockOnZone Zone) const
 {
 	switch (Zone)
 	{
@@ -1493,23 +1493,23 @@ float ADMCameraCharacter::GetRotationInterpSpeedForZone(ELockOnZone Zone) const
 	}
 }
 
-FVector ADMCameraCharacter::GetPlayerPivot() const
+FVector ARDBasecharacter::GetPlayerPivot() const
 {
 	return GetActorLocation() + FVector(0.f, 0.f, 70.f);
 }
 
-FVector ADMCameraCharacter::GetTargetPivot(AActor* Target) const
+FVector ARDBasecharacter::GetTargetPivot(AActor* Target) const
 {
 	return Target ? Target->GetActorLocation() + FVector(0.f, 0.f, 70.f) : FVector::ZeroVector;
 }
 
-float ADMCameraCharacter::GetDistanceToTarget2D(AActor* Target) const
+float ARDBasecharacter::GetDistanceToTarget2D(AActor* Target) const
 {
 	if (!Target) return BIG_NUMBER;
 	return FVector::Dist2D(GetPlayerPivot(), GetTargetPivot(Target));
 }
 
-bool ADMCameraCharacter::IsTargetInFrontHemisphere(AActor* Target) const
+bool ARDBasecharacter::IsTargetInFrontHemisphere(AActor* Target) const
 {
 	if (!Target || !Controller) return false;
 
@@ -1521,7 +1521,7 @@ bool ADMCameraCharacter::IsTargetInFrontHemisphere(AActor* Target) const
 	return FVector::DotProduct(CamForward, ToTarget) > 0.f;
 }
 
-void ADMCameraCharacter::EnterLockOn(AActor* NewTarget)
+void ARDBasecharacter::EnterLockOn(AActor* NewTarget)
 {
 	if (!NewTarget) return;
 
@@ -1534,7 +1534,7 @@ void ADMCameraCharacter::EnterLockOn(AActor* NewTarget)
 	PendingOrbitPitchInput = 0.f;
 }
 
-void ADMCameraCharacter::ExitLockOn()
+void ARDBasecharacter::ExitLockOn()
 {
 	PreviousLockTarget = CurrentLockTarget;
 	CurrentLockTarget = nullptr;
