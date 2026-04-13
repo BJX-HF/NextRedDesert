@@ -1,6 +1,6 @@
 #include "RDBasecharacter.h"
 
-#include "AbilitySystemComponent.h"
+#include "GAS/RDAbilityComponent.h"
 #include "Camera/CameraComponent.h"
 #include "Character/New/RDBasecharacterMovementComponent.h"
 #include "Character/New/WallRunSurfaceComponent.h"
@@ -71,7 +71,7 @@ ARDBasecharacter::ARDBasecharacter(const FObjectInitializer& ObjectInitializer)
 	WallRunDetector->SetGenerateOverlapEvents(true);
 	WallRunDetector->SetCanEverAffectNavigation(false);
 
-	AbilitySystemComponent = CreateDefaultSubobject<UAbilitySystemComponent>(TEXT("AbilitySystemComponent"));
+	AbilitySystemComponent = CreateDefaultSubobject<URDAbilityComponent>(TEXT("RDAbilityComponent"));
 	AbilitySystemComponent->SetIsReplicated(true);
 	AbilitySystemComponent->SetReplicationMode(EGameplayEffectReplicationMode::Mixed);
 
@@ -91,6 +91,8 @@ UAbilitySystemComponent* ARDBasecharacter::GetAbilitySystemComponent() const
 {
 	return AbilitySystemComponent;
 }
+
+
 
 void ARDBasecharacter::Jump()
 {

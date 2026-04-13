@@ -7,6 +7,7 @@
 #include "RDBasecharacter.generated.h"
 
 class UAbilitySystemComponent;
+class URDAbilityComponent;
 class UAITestAttributeSet;
 class UBoxComponent;
 class UCameraComponent;
@@ -63,6 +64,8 @@ public:
 	ARDBasecharacter(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 	virtual void Jump() override;
+
+
 
 	UFUNCTION(BlueprintCallable, Category = "Movement|Slide")
 	bool StartSlide();
@@ -125,7 +128,7 @@ protected:
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Abilities")
-	TObjectPtr<UAbilitySystemComponent> AbilitySystemComponent;
+	TObjectPtr<URDAbilityComponent> AbilitySystemComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Abilities")
 	TObjectPtr<UAITestAttributeSet> AttributeSet;
