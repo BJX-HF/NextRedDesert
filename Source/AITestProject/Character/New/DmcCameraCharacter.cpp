@@ -22,7 +22,7 @@
 #include "CollisionShape.h"
 #include "WorldCollision.h"
 
-//测试修改
+//测试修改git
 
 ADMCameraCharacter::ADMCameraCharacter(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer.SetDefaultSubobjectClass<UDmcCameraCharacterMovementComponent>(ACharacter::CharacterMovementComponentName))
