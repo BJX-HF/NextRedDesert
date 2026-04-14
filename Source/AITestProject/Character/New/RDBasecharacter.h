@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "AbilitySystemInterface.h"
+#include "Character/New/RDTargetingCameraComponent.h"
 #include "GameFramework/Character.h"
 #include "InputActionValue.h"
 #include "RDBasecharacter.generated.h"
@@ -19,24 +20,6 @@ class USpringArmComponent;
 class URDBasecharacterMovementComponent;
 class UWallRunSurfaceComponent;
 struct FOnAttributeChangeData;
-
-UENUM(BlueprintType)
-enum class ECombatCameraState : uint8
-{
-	Explore,
-	CombatFree,
-	LockOn,
-	Recover
-};
-
-UENUM(BlueprintType)
-enum class ELockOnZone : uint8
-{
-	Center,
-	Buffer,
-	Edge,
-	Offscreen
-};
 
 UENUM(BlueprintType)
 enum class EWallRunSide : uint8
@@ -118,6 +101,21 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Movement|WallRun")
 	float GetWallRunSpeed() const;
 
+	UFUNCTION(BlueprintPure, Category = "Camera")
+	URDTargetingCameraComponent* GetTargetingCameraComponent() const { return TargetingCameraComponent; }
+
+	UFUNCTION(BlueprintPure, Category = "Camera|Target")
+	AActor* GetCurrentLockTarget() const;
+
+	UFUNCTION(BlueprintPure, Category = "Camera|Target")
+	AActor* GetPreviousLockTarget() const;
+
+	UFUNCTION(BlueprintPure, Category = "Camera|State")
+	ECombatCameraState GetCombatCameraState() const;
+
+	UFUNCTION(BlueprintPure, Category = "Camera|State")
+	ELockOnZone GetCurrentLockOnZone() const;
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaSeconds) override;
@@ -154,6 +152,9 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera")
 	TObjectPtr<UCameraComponent> FollowCamera;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera")
+	TObjectPtr<URDTargetingCameraComponent> TargetingCameraComponent;
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Movement|WallRun")
@@ -348,181 +349,6 @@ protected:
 	mutable float LastWallRunDebugTime = -1000.f;
 
 protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera|State")
-	ECombatCameraState CameraState = ECombatCameraState::Explore;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera|State")
-	ELockOnZone CurrentZone = ELockOnZone::Center;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera|Target")
-	TObjectPtr<AActor> CurrentLockTarget = nullptr;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera|Target")
-	TObjectPtr<AActor> PreviousLockTarget = nullptr;
-
-protected:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera|Detect")
-	float CombatDetectRadius = 1800.f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera|Detect")
-	float LockAcquireRadius = 2200.f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera|Detect")
-	float MaxLockVerticalDelta = 500.f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera|Detect")
-	FName LockTargetTag = TEXT("LockTarget");
-
-protected:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera|State")
-	float UnlockRecoveryDelay = 1.0f;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera|State")
-	float UnlockRecoveryRemaining = 0.f;
-
-protected:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera|Explore")
-	float ExploreArmLength = 420.f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera|Explore")
-	FVector ExploreSocketOffset = FVector(0.f, 50.f, 65.f);
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera|Explore")
-	float ExploreFOV = 60.f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera|Explore")
-	float ExploreMinPitch = -50.f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera|Explore")
-	float ExploreMaxPitch = 25.f;
-
-protected:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera|CombatFree")
-	float CombatArmLength = 390.f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera|CombatFree")
-	FVector CombatSocketOffset = FVector(0.f, 35.f, 70.f);
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera|CombatFree")
-	float CombatFOV = 58.f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera|CombatFree")
-	float CombatMinPitch = -25.f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera|CombatFree")
-	float CombatMaxPitch = 15.f;
-
-protected:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera|LockOn")
-	float NearDistance = 350.f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera|LockOn")
-	float MidDistance = 800.f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera|LockOn")
-	float LockNearArmLength = 430.f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera|LockOn")
-	float LockMidArmLength = 380.f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera|LockOn")
-	float LockFarArmLength = 360.f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera|LockOn")
-	FVector LockNearSocketOffset = FVector(0.f, 20.f, 80.f);
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera|LockOn")
-	FVector LockMidSocketOffset = FVector(0.f, 15.f, 75.f);
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera|LockOn")
-	FVector LockFarSocketOffset = FVector(0.f, 10.f, 70.f);
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera|LockOn")
-	float LockNearFOV = 60.f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera|LockOn")
-	float LockMidFOV = 57.f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera|LockOn")
-	float LockFarFOV = 55.f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera|LockOn")
-	float LockMinPitch = -20.f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera|LockOn")
-	float LockMaxPitch = 18.f;
-
-protected:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera|LockOn")
-	float CenterAngle = 15.f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera|LockOn")
-	float BufferAngle = 35.f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera|LockOn")
-	float EdgeAngle = 65.f;
-
-protected:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera|Interp")
-	float ArmInterpSpeed = 8.f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera|Interp")
-	float OffsetInterpSpeed = 8.f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera|Interp")
-	float RotationInterpSpeed_Explore = 8.f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera|Interp")
-	float RotationInterpSpeed_Combat = 10.f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera|Interp")
-	float RotationInterpSpeed_Lock_Center = 5.f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera|Interp")
-	float RotationInterpSpeed_Lock_Buffer = 7.f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera|Interp")
-	float RotationInterpSpeed_Lock_Edge = 11.f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera|Interp")
-	float RotationInterpSpeed_Lock_Offscreen = 15.f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera|Interp")
-	float FOVInterpSpeed = 8.f;
-
-protected:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera|Orbit")
-	float LockOrbitYawMax = 20.f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera|Orbit")
-	float LockOrbitPitchMax = 8.f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera|Orbit")
-	float LockOrbitYawInputScale = 2.5f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera|Orbit")
-	float LockOrbitPitchInputScale = 1.2f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera|Orbit")
-	float LockOrbitDecaySpeed = 5.f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera|Orbit")
-	float HeightPitchFactor = 0.03f;
-
-protected:
-	float DesiredArmLength = 420.f;
-	FVector DesiredSocketOffset = FVector::ZeroVector;
-	FRotator DesiredControlRotation = FRotator::ZeroRotator;
-	float DesiredFOV = 60.f;
-
-	float PendingOrbitYawInput = 0.f;
-	float PendingOrbitPitchInput = 0.f;
-	float LockOrbitYaw = 0.f;
-	float LockOrbitPitch = 0.f;
-
-	float TargetSwitchCooldown = 0.f;
-
-protected:
 	void Move(const FInputActionValue& Value);
 	void Look(const FInputActionValue& Value);
 	void StartJump(const FInputActionValue& Value);
@@ -574,28 +400,8 @@ protected:
 
 	void UpdateCameraSystem(float DeltaSeconds);
 	void UpdateSlide(float DeltaSeconds);
-	void UpdateCameraState(float DeltaSeconds);
-	void SolveDesiredCamera(float DeltaSeconds);
-	void ApplyCamera(float DeltaSeconds);
 	void UpdateCharacterFacing(float DeltaSeconds);
 
 	bool CanStartSlide() const;
 	float GetClampedSlideCapsuleHalfHeight() const;
-
-	bool HasNearbyCombatTarget() const;
-	bool IsValidLockTarget(AActor* Actor) const;
-	TArray<AActor*> GatherCandidateTargets(float Radius) const;
-	AActor* FindBestLockTarget() const;
-	AActor* FindSwitchTarget(float DirectionSign) const;
-
-	ELockOnZone ComputeLockZone(float TargetYawDeg) const;
-	float GetRotationInterpSpeedForZone(ELockOnZone Zone) const;
-
-	FVector GetPlayerPivot() const;
-	FVector GetTargetPivot(AActor* Target) const;
-	float GetDistanceToTarget2D(AActor* Target) const;
-	bool IsTargetInFrontHemisphere(AActor* Target) const;
-
-	void EnterLockOn(AActor* NewTarget);
-	void ExitLockOn();
 };

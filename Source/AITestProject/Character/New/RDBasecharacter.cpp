@@ -3,6 +3,7 @@
 #include "GAS/RDAbilityComponent.h"
 #include "Camera/CameraComponent.h"
 #include "Character/New/RDBasecharacterMovementComponent.h"
+#include "Character/New/RDTargetingCameraComponent.h"
 #include "Character/New/WallRunSurfaceComponent.h"
 #include "Components/BoxComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -17,10 +18,7 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "GAS/AITestAttributeSet.h"
 #include "Engine/LocalPlayer.h"
-#include "Engine/OverlapResult.h"
 #include "Engine/World.h"
-#include "CollisionShape.h"
-#include "WorldCollision.h"
 
 //测试修改git
 
@@ -46,8 +44,8 @@ ARDBasecharacter::ARDBasecharacter(const FObjectInitializer& ObjectInitializer)
 
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(RootComponent);
-	CameraBoom->TargetArmLength = ExploreArmLength;
-	CameraBoom->SocketOffset = ExploreSocketOffset;
+	CameraBoom->TargetArmLength = 420.f;
+	CameraBoom->SocketOffset = FVector(0.f, 50.f, 65.f);
 	CameraBoom->bUsePawnControlRotation = true;
 	CameraBoom->bDoCollisionTest = true;
 	CameraBoom->ProbeSize = 12.f;
@@ -58,7 +56,10 @@ ARDBasecharacter::ARDBasecharacter(const FObjectInitializer& ObjectInitializer)
 	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
 	FollowCamera->bUsePawnControlRotation = false;
-	FollowCamera->FieldOfView = ExploreFOV;
+	FollowCamera->FieldOfView = 60.f;
+
+	TargetingCameraComponent = CreateDefaultSubobject<URDTargetingCameraComponent>(TEXT("TargetingCameraComponent"));
+	TargetingCameraComponent->InitializeCamera(CameraBoom, FollowCamera);
 
 	WallRunDetector = CreateDefaultSubobject<UBoxComponent>(TEXT("WallRunDetector"));
 	WallRunDetector->SetupAttachment(GetCapsuleComponent());
@@ -76,10 +77,6 @@ ARDBasecharacter::ARDBasecharacter(const FObjectInitializer& ObjectInitializer)
 	AbilitySystemComponent->SetReplicationMode(EGameplayEffectReplicationMode::Mixed);
 
 	AttributeSet = CreateDefaultSubobject<UAITestAttributeSet>(TEXT("AttributeSet"));
-
-	DesiredArmLength = ExploreArmLength;
-	DesiredSocketOffset = ExploreSocketOffset;
-	DesiredFOV = ExploreFOV;
 
 	DefaultCapsuleHalfHeight = GetCapsuleComponent()->GetUnscaledCapsuleHalfHeight();
 	DefaultGroundFriction = GetCharacterMovement()->GroundFriction;
@@ -126,6 +123,11 @@ void ARDBasecharacter::BeginPlay()
 		WallRunDetector->OnComponentEndOverlap.AddDynamic(this, &ARDBasecharacter::OnWallRunDetectorEndOverlap);
 	}
 
+	if (TargetingCameraComponent)
+	{
+		TargetingCameraComponent->InitializeCamera(CameraBoom, FollowCamera);
+	}
+
 	if (APlayerController* PC = Cast<APlayerController>(GetController()))
 	{
 		if (ULocalPlayer* LocalPlayer = PC->GetLocalPlayer())
@@ -140,7 +142,6 @@ void ARDBasecharacter::BeginPlay()
 			}
 		}
 
-		DesiredControlRotation = PC->GetControlRotation();
 	}
 }
 
@@ -155,11 +156,6 @@ void ARDBasecharacter::Tick(float DeltaSeconds)
 	Super::Tick(DeltaSeconds);
 
 	HorizontalSpeed = FVector(GetVelocity().X, GetVelocity().Y, 0.f).Size();
-
-	if (TargetSwitchCooldown > 0.f)
-	{
-		TargetSwitchCooldown -= DeltaSeconds;
-	}
 
 	if (SlideCooldownRemaining > 0.f)
 	{
@@ -318,24 +314,9 @@ void ARDBasecharacter::Look(const FInputActionValue& Value)
 	const FVector2D LookAxisVector = Value.Get<FVector2D>();
 	if (!Controller) return;
 
-	if (CameraState == ECombatCameraState::LockOn)
+	if (TargetingCameraComponent)
 	{
-		PendingOrbitYawInput += LookAxisVector.X * LockOrbitYawInputScale;
-		PendingOrbitPitchInput += LookAxisVector.Y * LockOrbitPitchInputScale;
-	}
-	else
-	{
-		AddControllerYawInput(LookAxisVector.X);
-		AddControllerPitchInput(LookAxisVector.Y);
-
-		if (APlayerController* PC = Cast<APlayerController>(Controller))
-		{
-			FRotator ControlRot = PC->GetControlRotation();
-			const float MinPitch = (CameraState == ECombatCameraState::Explore) ? ExploreMinPitch : CombatMinPitch;
-			const float MaxPitch = (CameraState == ECombatCameraState::Explore) ? ExploreMaxPitch : CombatMaxPitch;
-			ControlRot.Pitch = FMath::ClampAngle(ControlRot.Pitch, MinPitch, MaxPitch);
-			PC->SetControlRotation(ControlRot);
-		}
+		TargetingCameraComponent->HandleLookInput(LookAxisVector);
 	}
 }
 
@@ -363,39 +344,17 @@ void ARDBasecharacter::HandleSlideInput(const FInputActionValue& Value)
 
 void ARDBasecharacter::ToggleLockOn(const FInputActionValue& Value)
 {
-	if (CurrentLockTarget)
+	if (TargetingCameraComponent)
 	{
-		ExitLockOn();
-		return;
-	}
-
-	if (AActor* NewTarget = FindBestLockTarget())
-	{
-		EnterLockOn(NewTarget);
+		TargetingCameraComponent->ToggleLockOn();
 	}
 }
 
 void ARDBasecharacter::SwitchTarget(const FInputActionValue& Value)
 {
-	if (!CurrentLockTarget || CameraState != ECombatCameraState::LockOn || TargetSwitchCooldown > 0.f)
+	if (TargetingCameraComponent)
 	{
-		return;
-	}
-
-	const float AxisValue = Value.Get<float>();
-	if (FMath::Abs(AxisValue) < 0.5f)
-	{
-		return;
-	}
-
-	if (AActor* NewTarget = FindSwitchTarget(FMath::Sign(AxisValue)))
-	{
-		if (NewTarget != CurrentLockTarget)
-		{
-			PreviousLockTarget = CurrentLockTarget;
-			CurrentLockTarget = NewTarget;
-			TargetSwitchCooldown = 0.2f;
-		}
+		TargetingCameraComponent->SwitchTarget(Value.Get<float>());
 	}
 }
 
@@ -970,9 +929,11 @@ URDBasecharacterMovementComponent* ARDBasecharacter::GetRDBasecharacterMovementC
 
 void ARDBasecharacter::UpdateCameraSystem(float DeltaSeconds)
 {
-	UpdateCameraState(DeltaSeconds);
-	SolveDesiredCamera(DeltaSeconds);
-	ApplyCamera(DeltaSeconds);
+	if (TargetingCameraComponent)
+	{
+		TargetingCameraComponent->TickCamera(DeltaSeconds);
+	}
+
 	UpdateCharacterFacing(DeltaSeconds);
 }
 
@@ -1028,157 +989,6 @@ void ARDBasecharacter::UpdateSlide(float DeltaSeconds)
 	}
 }
 
-void ARDBasecharacter::UpdateCameraState(float DeltaSeconds)
-{
-	if (CurrentLockTarget && !IsValidLockTarget(CurrentLockTarget))
-	{
-		ExitLockOn();
-	}
-
-	if (CurrentLockTarget)
-	{
-		CameraState = ECombatCameraState::LockOn;
-		return;
-	}
-
-	if (UnlockRecoveryRemaining > 0.f)
-	{
-		UnlockRecoveryRemaining -= DeltaSeconds;
-		CameraState = ECombatCameraState::Recover;
-		return;
-	}
-
-	CameraState = HasNearbyCombatTarget() ? ECombatCameraState::CombatFree : ECombatCameraState::Explore;
-}
-
-void ARDBasecharacter::SolveDesiredCamera(float DeltaSeconds)
-{
-	APlayerController* PC = Cast<APlayerController>(Controller);
-	if (!PC) return;
-
-	FRotator CurrentControlRot = PC->GetControlRotation();
-
-	if (CameraState == ECombatCameraState::Explore)
-	{
-		DesiredArmLength = ExploreArmLength;
-		DesiredSocketOffset = ExploreSocketOffset;
-		DesiredFOV = ExploreFOV;
-		DesiredControlRotation = CurrentControlRot;
-		DesiredControlRotation.Pitch = FMath::ClampAngle(DesiredControlRotation.Pitch, ExploreMinPitch, ExploreMaxPitch);
-		CurrentZone = ELockOnZone::Center;
-		return;
-	}
-
-	if (CameraState == ECombatCameraState::CombatFree || CameraState == ECombatCameraState::Recover)
-	{
-		DesiredArmLength = CombatArmLength;
-		DesiredSocketOffset = CombatSocketOffset;
-		DesiredFOV = CombatFOV;
-		DesiredControlRotation = CurrentControlRot;
-		DesiredControlRotation.Pitch = FMath::ClampAngle(DesiredControlRotation.Pitch, CombatMinPitch, CombatMaxPitch);
-		CurrentZone = ELockOnZone::Center;
-		return;
-	}
-
-	if (!CurrentLockTarget)
-	{
-		return;
-	}
-
-	const FVector PlayerPivot = GetPlayerPivot();
-	const FVector TargetPivot = GetTargetPivot(CurrentLockTarget);
-	const FVector ToTarget = TargetPivot - PlayerPivot;
-	const float Distance2D = FVector(ToTarget.X, ToTarget.Y, 0.f).Length();
-
-	if (Distance2D <= NearDistance)
-	{
-		DesiredArmLength = LockNearArmLength;
-		DesiredSocketOffset = LockNearSocketOffset;
-		DesiredFOV = LockNearFOV;
-	}
-	else if (Distance2D <= MidDistance)
-	{
-		DesiredArmLength = LockMidArmLength;
-		DesiredSocketOffset = LockMidSocketOffset;
-		DesiredFOV = LockMidFOV;
-	}
-	else
-	{
-		DesiredArmLength = LockFarArmLength;
-		DesiredSocketOffset = LockFarSocketOffset;
-		DesiredFOV = LockFarFOV;
-	}
-
-	const float HeightDelta = TargetPivot.Z - PlayerPivot.Z;
-	LockOrbitYaw = FMath::Clamp(LockOrbitYaw + PendingOrbitYawInput, -LockOrbitYawMax, LockOrbitYawMax);
-	LockOrbitPitch = FMath::Clamp(LockOrbitPitch + PendingOrbitPitchInput, -LockOrbitPitchMax, LockOrbitPitchMax);
-	PendingOrbitYawInput = 0.f;
-	PendingOrbitPitchInput = 0.f;
-
-	const FRotator BaseLookRot = ToTarget.Rotation();
-	float DesiredYaw = BaseLookRot.Yaw + LockOrbitYaw;
-	float DesiredPitch = BaseLookRot.Pitch + HeightDelta * HeightPitchFactor + LockOrbitPitch;
-	DesiredPitch = FMath::ClampAngle(DesiredPitch, LockMinPitch, LockMaxPitch);
-
-	CurrentZone = ComputeLockZone(BaseLookRot.Yaw);
-	const bool bDangerZone = CurrentZone == ELockOnZone::Edge || CurrentZone == ELockOnZone::Offscreen;
-	LockOrbitYaw = FMath::FInterpTo(LockOrbitYaw, 0.f, DeltaSeconds, bDangerZone ? LockOrbitDecaySpeed * 2.0f : LockOrbitDecaySpeed);
-	LockOrbitPitch = FMath::FInterpTo(LockOrbitPitch, 0.f, DeltaSeconds, LockOrbitDecaySpeed);
-
-	if (CurrentZone == ELockOnZone::Offscreen)
-	{
-		DesiredArmLength += 30.f;
-		DesiredSocketOffset.Z += 10.f;
-	}
-
-	DesiredControlRotation = FRotator(DesiredPitch, DesiredYaw, 0.f);
-}
-
-void ARDBasecharacter::ApplyCamera(float DeltaSeconds)
-{
-	APlayerController* PC = Cast<APlayerController>(Controller);
-	if (!PC) return;
-
-	CameraBoom->TargetArmLength = FMath::FInterpTo(CameraBoom->TargetArmLength, DesiredArmLength, DeltaSeconds, ArmInterpSpeed);
-	CameraBoom->SocketOffset = FMath::VInterpTo(CameraBoom->SocketOffset, DesiredSocketOffset, DeltaSeconds, OffsetInterpSpeed);
-
-	float RotationInterpSpeed = RotationInterpSpeed_Explore;
-	switch (CameraState)
-	{
-	case ECombatCameraState::Explore:
-		RotationInterpSpeed = RotationInterpSpeed_Explore;
-		break;
-	case ECombatCameraState::CombatFree:
-	case ECombatCameraState::Recover:
-		RotationInterpSpeed = RotationInterpSpeed_Combat;
-		break;
-	case ECombatCameraState::LockOn:
-		RotationInterpSpeed = GetRotationInterpSpeedForZone(CurrentZone);
-		break;
-	default:
-		break;
-	}
-
-	FRotator NewControlRot = FMath::RInterpTo(PC->GetControlRotation(), DesiredControlRotation, DeltaSeconds, RotationInterpSpeed);
-	if (CameraState == ECombatCameraState::Explore)
-	{
-		NewControlRot.Pitch = FMath::ClampAngle(NewControlRot.Pitch, ExploreMinPitch, ExploreMaxPitch);
-	}
-	else if (CameraState == ECombatCameraState::CombatFree || CameraState == ECombatCameraState::Recover)
-	{
-		NewControlRot.Pitch = FMath::ClampAngle(NewControlRot.Pitch, CombatMinPitch, CombatMaxPitch);
-	}
-	else
-	{
-		NewControlRot.Pitch = FMath::ClampAngle(NewControlRot.Pitch, LockMinPitch, LockMaxPitch);
-	}
-
-	PC->SetControlRotation(NewControlRot);
-
-	const float NewFOV = FMath::FInterpTo(FollowCamera->FieldOfView, DesiredFOV, DeltaSeconds, FOVInterpSpeed);
-	FollowCamera->SetFieldOfView(NewFOV);
-}
-
 void ARDBasecharacter::UpdateCharacterFacing(float DeltaSeconds)
 {
 	if (bIsWallRunning)
@@ -1211,11 +1021,14 @@ void ARDBasecharacter::UpdateCharacterFacing(float DeltaSeconds)
 		return;
 	}
 
-	if (CameraState == ECombatCameraState::LockOn && CurrentLockTarget)
+	AActor* CurrentLockTarget = TargetingCameraComponent ? TargetingCameraComponent->GetCurrentLockTarget() : nullptr;
+	if (TargetingCameraComponent
+		&& TargetingCameraComponent->GetCameraState() == ECombatCameraState::LockOn
+		&& CurrentLockTarget)
 	{
 		GetCharacterMovement()->bOrientRotationToMovement = false;
 
-		const FVector ToTarget = GetTargetPivot(CurrentLockTarget) - GetActorLocation();
+		const FVector ToTarget = TargetingCameraComponent->GetTargetPivot(CurrentLockTarget) - GetActorLocation();
 		FRotator DesiredActorRot = ToTarget.Rotation();
 		DesiredActorRot.Pitch = 0.f;
 		DesiredActorRot.Roll = 0.f;
@@ -1325,225 +1138,22 @@ float ARDBasecharacter::GetWallRunSpeed() const
 	return FMath::Abs(FVector::DotProduct(GetVelocity(), CurrentWallRunDirection.GetSafeNormal()));
 }
 
-bool ARDBasecharacter::HasNearbyCombatTarget() const
+AActor* ARDBasecharacter::GetCurrentLockTarget() const
 {
-	return GatherCandidateTargets(CombatDetectRadius).Num() > 0;
+	return TargetingCameraComponent ? TargetingCameraComponent->GetCurrentLockTarget() : nullptr;
 }
 
-bool ARDBasecharacter::IsValidLockTarget(AActor* Actor) const
+AActor* ARDBasecharacter::GetPreviousLockTarget() const
 {
-	if (!Actor || Actor == this || Actor->IsPendingKillPending() || !Actor->ActorHasTag(LockTargetTag))
-	{
-		return false;
-	}
-
-	const FVector PlayerPivot = GetPlayerPivot();
-	const FVector TargetPivot = GetTargetPivot(Actor);
-	const float Dist2D = FVector(TargetPivot.X - PlayerPivot.X, TargetPivot.Y - PlayerPivot.Y, 0.f).Length();
-	if (Dist2D > LockAcquireRadius)
-	{
-		return false;
-	}
-
-	return FMath::Abs(TargetPivot.Z - PlayerPivot.Z) <= MaxLockVerticalDelta;
+	return TargetingCameraComponent ? TargetingCameraComponent->GetPreviousLockTarget() : nullptr;
 }
 
-TArray<AActor*> ARDBasecharacter::GatherCandidateTargets(float Radius) const
+ECombatCameraState ARDBasecharacter::GetCombatCameraState() const
 {
-	TArray<AActor*> Results;
-	if (!GetWorld()) return Results;
-
-	TArray<FOverlapResult> Overlaps;
-	FCollisionObjectQueryParams ObjectQueryParams;
-	ObjectQueryParams.AddObjectTypesToQuery(ECC_Pawn);
-
-	FCollisionQueryParams QueryParams;
-	QueryParams.AddIgnoredActor(this);
-
-	const bool bHit = GetWorld()->OverlapMultiByObjectType(
-		Overlaps,
-		GetActorLocation(),
-		FQuat::Identity,
-		ObjectQueryParams,
-		FCollisionShape::MakeSphere(Radius),
-		QueryParams);
-
-	if (!bHit) return Results;
-
-	for (const FOverlapResult& Overlap : Overlaps)
-	{
-		if (AActor* HitActor = Overlap.GetActor())
-		{
-			if (IsValidLockTarget(HitActor))
-			{
-				Results.AddUnique(HitActor);
-			}
-		}
-	}
-
-	return Results;
+	return TargetingCameraComponent ? TargetingCameraComponent->GetCameraState() : ECombatCameraState::Explore;
 }
 
-AActor* ARDBasecharacter::FindBestLockTarget() const
+ELockOnZone ARDBasecharacter::GetCurrentLockOnZone() const
 {
-	TArray<AActor*> Candidates = GatherCandidateTargets(LockAcquireRadius);
-	if (Candidates.IsEmpty()) return nullptr;
-
-	APlayerController* PC = Cast<APlayerController>(Controller);
-	if (!PC) return nullptr;
-
-	const FVector PlayerPivot = GetPlayerPivot();
-	const FVector CamForward = FRotationMatrix(PC->GetControlRotation()).GetUnitAxis(EAxis::X);
-
-	AActor* BestTarget = nullptr;
-	float BestScore = -FLT_MAX;
-
-	for (AActor* Candidate : Candidates)
-	{
-		const FVector TargetPivot = GetTargetPivot(Candidate);
-		const FVector ToTarget = (TargetPivot - PlayerPivot).GetSafeNormal();
-		const float Distance = FVector::Dist2D(PlayerPivot, TargetPivot);
-		const float Dot = FVector::DotProduct(CamForward, ToTarget);
-		float Score = (Dot * 1000.f) - Distance;
-
-		if (Dot > 0.f)
-		{
-			Score += 200.f;
-		}
-
-		if (Score > BestScore)
-		{
-			BestScore = Score;
-			BestTarget = Candidate;
-		}
-	}
-
-	return BestTarget;
+	return TargetingCameraComponent ? TargetingCameraComponent->GetCurrentZone() : ELockOnZone::Center;
 }
-
-AActor* ARDBasecharacter::FindSwitchTarget(float DirectionSign) const
-{
-	TArray<AActor*> Candidates = GatherCandidateTargets(LockAcquireRadius);
-	if (Candidates.IsEmpty() || !CurrentLockTarget) return nullptr;
-
-	APlayerController* PC = Cast<APlayerController>(Controller);
-	if (!PC) return nullptr;
-
-	const FVector PlayerPivot = GetPlayerPivot();
-	const FVector CamForward = FRotationMatrix(PC->GetControlRotation()).GetUnitAxis(EAxis::X);
-	const FVector CamRight = FRotationMatrix(PC->GetControlRotation()).GetUnitAxis(EAxis::Y);
-
-	AActor* BestTarget = nullptr;
-	float BestScore = -FLT_MAX;
-
-	for (AActor* Candidate : Candidates)
-	{
-		if (Candidate == CurrentLockTarget)
-		{
-			continue;
-		}
-
-		const FVector ToTarget = (GetTargetPivot(Candidate) - PlayerPivot).GetSafeNormal();
-		const float Side = FVector::DotProduct(CamRight, ToTarget);
-		if ((DirectionSign > 0.f && Side <= 0.f) || (DirectionSign < 0.f && Side >= 0.f))
-		{
-			continue;
-		}
-
-		const float Front = FVector::DotProduct(CamForward, ToTarget);
-		const float Distance = FVector::Dist2D(PlayerPivot, GetTargetPivot(Candidate));
-		const float Score = Front * 1000.f - Distance + FMath::Abs(Side) * 100.f;
-
-		if (Score > BestScore)
-		{
-			BestScore = Score;
-			BestTarget = Candidate;
-		}
-	}
-
-	return BestTarget ? BestTarget : CurrentLockTarget.Get();
-}
-
-ELockOnZone ARDBasecharacter::ComputeLockZone(float TargetYawDeg) const
-{
-	APlayerController* PC = Cast<APlayerController>(Controller);
-	if (!PC) return ELockOnZone::Center;
-
-	const float CurrentYaw = PC->GetControlRotation().Yaw;
-	const float DeltaYaw = FMath::Abs(FMath::FindDeltaAngleDegrees(CurrentYaw, TargetYawDeg));
-
-	if (DeltaYaw <= CenterAngle) return ELockOnZone::Center;
-	if (DeltaYaw <= BufferAngle) return ELockOnZone::Buffer;
-	if (DeltaYaw <= EdgeAngle) return ELockOnZone::Edge;
-	return ELockOnZone::Offscreen;
-}
-
-float ARDBasecharacter::GetRotationInterpSpeedForZone(ELockOnZone Zone) const
-{
-	switch (Zone)
-	{
-	case ELockOnZone::Center:
-		return RotationInterpSpeed_Lock_Center;
-	case ELockOnZone::Buffer:
-		return RotationInterpSpeed_Lock_Buffer;
-	case ELockOnZone::Edge:
-		return RotationInterpSpeed_Lock_Edge;
-	case ELockOnZone::Offscreen:
-		return RotationInterpSpeed_Lock_Offscreen;
-	default:
-		return RotationInterpSpeed_Lock_Center;
-	}
-}
-
-FVector ARDBasecharacter::GetPlayerPivot() const
-{
-	return GetActorLocation() + FVector(0.f, 0.f, 70.f);
-}
-
-FVector ARDBasecharacter::GetTargetPivot(AActor* Target) const
-{
-	return Target ? Target->GetActorLocation() + FVector(0.f, 0.f, 70.f) : FVector::ZeroVector;
-}
-
-float ARDBasecharacter::GetDistanceToTarget2D(AActor* Target) const
-{
-	if (!Target) return BIG_NUMBER;
-	return FVector::Dist2D(GetPlayerPivot(), GetTargetPivot(Target));
-}
-
-bool ARDBasecharacter::IsTargetInFrontHemisphere(AActor* Target) const
-{
-	if (!Target || !Controller) return false;
-
-	APlayerController* PC = Cast<APlayerController>(Controller);
-	if (!PC) return false;
-
-	const FVector CamForward = FRotationMatrix(PC->GetControlRotation()).GetUnitAxis(EAxis::X);
-	const FVector ToTarget = (GetTargetPivot(Target) - GetPlayerPivot()).GetSafeNormal();
-	return FVector::DotProduct(CamForward, ToTarget) > 0.f;
-}
-
-void ARDBasecharacter::EnterLockOn(AActor* NewTarget)
-{
-	if (!NewTarget) return;
-
-	CurrentLockTarget = NewTarget;
-	PreviousLockTarget = nullptr;
-	UnlockRecoveryRemaining = 0.f;
-	LockOrbitYaw = 0.f;
-	LockOrbitPitch = 0.f;
-	PendingOrbitYawInput = 0.f;
-	PendingOrbitPitchInput = 0.f;
-}
-
-void ARDBasecharacter::ExitLockOn()
-{
-	PreviousLockTarget = CurrentLockTarget;
-	CurrentLockTarget = nullptr;
-	LockOrbitYaw = 0.f;
-	LockOrbitPitch = 0.f;
-	PendingOrbitYawInput = 0.f;
-	PendingOrbitPitchInput = 0.f;
-	UnlockRecoveryRemaining = UnlockRecoveryDelay;
-}
-
