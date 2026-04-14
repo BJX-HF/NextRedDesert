@@ -2,6 +2,7 @@
 
 #include "Camera/CameraComponent.h"
 #include "CollisionShape.h"
+#include "DrawDebugHelpers.h"
 #include "Engine/OverlapResult.h"
 #include "Engine/World.h"
 #include "GameFramework/Character.h"
@@ -66,8 +67,6 @@ void URDTargetingCameraComponent::HandleLookInput(const FVector2D& LookAxisVecto
 
 	if (CameraState == ECombatCameraState::LockOn)
 	{
-		PendingOrbitYawInput += LookAxisVector.X * LockOrbitYawInputScale;
-		PendingOrbitPitchInput += LookAxisVector.Y * LockOrbitPitchInputScale;
 		return;
 	}
 
@@ -218,7 +217,30 @@ void URDTargetingCameraComponent::SolveDesiredCamera(float DeltaSeconds)
 	float DesiredPitch = BaseLookRot.Pitch + HeightDelta * HeightPitchFactor + LockOrbitPitch;
 	DesiredPitch = FMath::ClampAngle(DesiredPitch, LockMinPitch, LockMaxPitch);
 
+	CurrentLockDeltaYaw = FMath::Abs(FMath::FindDeltaAngleDegrees(CurrentControlRot.Yaw, BaseLookRot.Yaw));
 	CurrentZone = ComputeLockZone(BaseLookRot.Yaw);
+
+	if (RotationInterpSpeed_Lock_Center <= 0.f)
+	{
+		const float StartRotationAngle = CenterAngle + LockRotationHysteresisAngle;
+		const float StopRotationAngle = FMath::Max(0.f, CenterAngle - LockRotationHysteresisAngle);
+
+		if (bLockCameraRotationActive)
+		{
+			bLockCameraRotationActive = CurrentLockDeltaYaw > StopRotationAngle;
+		}
+		else
+		{
+			bLockCameraRotationActive = CurrentLockDeltaYaw > StartRotationAngle;
+		}
+	}
+	else
+	{
+		bLockCameraRotationActive = true;
+	}
+
+	DrawLockAngleDebug(BaseLookRot.Yaw);
+
 	const bool bDangerZone = CurrentZone == ELockOnZone::Edge || CurrentZone == ELockOnZone::Offscreen;
 	LockOrbitYaw = FMath::FInterpTo(LockOrbitYaw, 0.f, DeltaSeconds, bDangerZone ? LockOrbitDecaySpeed * 2.0f : LockOrbitDecaySpeed);
 	LockOrbitPitch = FMath::FInterpTo(LockOrbitPitch, 0.f, DeltaSeconds, LockOrbitDecaySpeed);
@@ -257,12 +279,28 @@ void URDTargetingCameraComponent::ApplyCamera(float DeltaSeconds)
 		break;
 	case ECombatCameraState::LockOn:
 		RotationInterpSpeed = GetRotationInterpSpeedForZone(CurrentZone);
+		if (RotationInterpSpeed_Lock_Center <= 0.f)
+		{
+			if (!bLockCameraRotationActive)
+			{
+				RotationInterpSpeed = 0.f;
+			}
+			else if (CurrentZone == ELockOnZone::Center)
+			{
+				RotationInterpSpeed = RotationInterpSpeed_Lock_Buffer;
+			}
+		}
 		break;
 	default:
 		break;
 	}
 
-	FRotator NewControlRot = FMath::RInterpTo(PC->GetControlRotation(), DesiredControlRotation, DeltaSeconds, RotationInterpSpeed);
+	FRotator NewControlRot = PC->GetControlRotation();
+	if (RotationInterpSpeed > 0.f)
+	{
+		NewControlRot = FMath::RInterpTo(NewControlRot, DesiredControlRotation, DeltaSeconds, RotationInterpSpeed);
+	}
+
 	if (CameraState == ECombatCameraState::Explore)
 	{
 		NewControlRot.Pitch = FMath::ClampAngle(NewControlRot.Pitch, ExploreMinPitch, ExploreMaxPitch);
@@ -454,6 +492,71 @@ float URDTargetingCameraComponent::GetRotationInterpSpeedForZone(ELockOnZone Zon
 	}
 }
 
+void URDTargetingCameraComponent::DrawLockAngleDebug(float TargetYawDeg) const
+{
+	if (!bDebugDrawLockAngle || !OwnerCharacter || !CurrentLockTarget || !GetWorld())
+	{
+		return;
+	}
+
+	const APlayerController* PC = Cast<APlayerController>(OwnerCharacter->GetController());
+	if (!PC)
+	{
+		return;
+	}
+
+	const FVector PlayerPivot = GetPlayerPivot();
+	const FVector TargetPivot = GetTargetPivot(CurrentLockTarget);
+	const FVector DebugOrigin = FVector(PlayerPivot.X, PlayerPivot.Y, PlayerPivot.Z + 35.f);
+	const FVector TargetPoint = FVector(TargetPivot.X, TargetPivot.Y, DebugOrigin.Z);
+
+	const FRotator ControlYawRot(0.f, PC->GetControlRotation().Yaw, 0.f);
+	const FVector ControlForward = FRotationMatrix(ControlYawRot).GetUnitAxis(EAxis::X).GetSafeNormal2D();
+	const FVector ToTarget = (TargetPoint - DebugOrigin).GetSafeNormal2D();
+	if (ControlForward.IsNearlyZero() || ToTarget.IsNearlyZero())
+	{
+		return;
+	}
+
+	const float DeltaYaw = FMath::Abs(FMath::FindDeltaAngleDegrees(PC->GetControlRotation().Yaw, TargetYawDeg));
+
+	FColor ZoneColor = FColor::Green;
+	switch (CurrentZone)
+	{
+	case ELockOnZone::Center:
+		ZoneColor = FColor::Green;
+		break;
+	case ELockOnZone::Buffer:
+		ZoneColor = FColor::Yellow;
+		break;
+	case ELockOnZone::Edge:
+		ZoneColor = FColor::Orange;
+		break;
+	case ELockOnZone::Offscreen:
+		ZoneColor = FColor::Red;
+		break;
+	default:
+		break;
+	}
+
+	const FVector ControlEnd = DebugOrigin + ControlForward * DebugDrawLength;
+	const FVector TargetDirectionEnd = DebugOrigin + ToTarget * DebugDrawLength;
+
+	DrawDebugDirectionalArrow(GetWorld(), DebugOrigin, ControlEnd, 40.f, FColor::Cyan, false, 0.f, 0, 3.f);
+	DrawDebugDirectionalArrow(GetWorld(), DebugOrigin, TargetDirectionEnd, 40.f, ZoneColor, false, 0.f, 0, 3.f);
+	DrawDebugLine(GetWorld(), DebugOrigin, TargetPoint, ZoneColor, false, 0.f, 0, 1.5f);
+	DrawDebugSphere(GetWorld(), DebugOrigin, 18.f, 12, FColor::Cyan, false, 0.f, 0, 1.5f);
+	DrawDebugSphere(GetWorld(), TargetPoint, 18.f, 12, ZoneColor, false, 0.f, 0, 1.5f);
+	DrawDebugString(
+		GetWorld(),
+		DebugOrigin + FVector(0.f, 0.f, 65.f),
+		FString::Printf(TEXT("Lock DeltaYaw: %.1f | Center: %.1f | Buffer: %.1f | Edge: %.1f | RotActive: %s"), DeltaYaw, CenterAngle, BufferAngle, EdgeAngle, bLockCameraRotationActive ? TEXT("true") : TEXT("false")),
+		nullptr,
+		ZoneColor,
+		0.f,
+		true);
+}
+
 FVector URDTargetingCameraComponent::GetPlayerPivot() const
 {
 	return OwnerCharacter ? OwnerCharacter->GetActorLocation() + FVector(0.f, 0.f, 70.f) : FVector::ZeroVector;
@@ -493,6 +596,8 @@ void URDTargetingCameraComponent::EnterLockOn(AActor* NewTarget)
 	LockOrbitPitch = 0.f;
 	PendingOrbitYawInput = 0.f;
 	PendingOrbitPitchInput = 0.f;
+	CurrentLockDeltaYaw = 0.f;
+	bLockCameraRotationActive = false;
 }
 
 void URDTargetingCameraComponent::ExitLockOn()
@@ -503,5 +608,7 @@ void URDTargetingCameraComponent::ExitLockOn()
 	LockOrbitPitch = 0.f;
 	PendingOrbitYawInput = 0.f;
 	PendingOrbitPitchInput = 0.f;
+	CurrentLockDeltaYaw = 0.f;
+	bLockCameraRotationActive = false;
 	UnlockRecoveryRemaining = UnlockRecoveryDelay;
 }

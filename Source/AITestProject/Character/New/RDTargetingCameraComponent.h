@@ -174,6 +174,15 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera|LockOn")
 	float EdgeAngle = 65.f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera|LockOn", meta = (ClampMin = "0.0"))
+	float LockRotationHysteresisAngle = 3.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera|LockOn|Debug")
+	bool bDebugDrawLockAngle = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera|LockOn|Debug", meta = (ClampMin = "0.0"))
+	float DebugDrawLength = 500.f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera|Interp")
 	float ArmInterpSpeed = 8.f;
 
@@ -229,6 +238,8 @@ protected:
 	float LockOrbitYaw = 0.f;
 	float LockOrbitPitch = 0.f;
 	float TargetSwitchCooldown = 0.f;
+	float CurrentLockDeltaYaw = 0.f;
+	bool bLockCameraRotationActive = false;
 
 	void UpdateCameraState(float DeltaSeconds);
 	void SolveDesiredCamera(float DeltaSeconds);
@@ -242,6 +253,7 @@ protected:
 
 	ELockOnZone ComputeLockZone(float TargetYawDeg) const;
 	float GetRotationInterpSpeedForZone(ELockOnZone Zone) const;
+	void DrawLockAngleDebug(float TargetYawDeg) const;
 
 	FVector GetPlayerPivot() const;
 	float GetDistanceToTarget2D(AActor* Target) const;
