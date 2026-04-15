@@ -15,14 +15,44 @@ URDAbilityComponent::URDAbilityComponent()
 	GrabAbilityClass = UGA_Grab::StaticClass();
 }
 
+void URDAbilityComponent::SetMainState(ERDAbilityMainState NewState)
+{
+	StateMachine.SetMainState(NewState);
+}
+
+bool URDAbilityComponent::CanTransitSkillState(ERDSkillFlowState FromState, ERDSkillFlowState ToState) const
+{
+	return StateMachine.CanTransitSkillState(FromState, ToState);
+}
+
+bool URDAbilityComponent::SetSkillState(ERDSkillFlowState NewState)
+{
+	return StateMachine.SetSkillState(NewState);
+}
+
+bool URDAbilityComponent::CanEnterDash() const
+{
+	return StateMachine.CanEnterDash();
+}
+
+bool URDAbilityComponent::CanEnterGrab() const
+{
+	return StateMachine.CanEnterGrab();
+}
+
 bool URDAbilityComponent::TryStartDash()
 {
-	if (!DashAbilityClass)
+	if (!DashAbilityClass || !CanEnterDash())
 	{
 		return false;
 	}
 
-	return TryActivateAbilityByClass(DashAbilityClass);
+	if (!TryActivateAbilityByClass(DashAbilityClass))
+	{
+		return false;
+	}
+
+	return SetSkillState(ERDSkillFlowState::DashStartup);
 }
 
 bool URDAbilityComponent::CanStartGrab(AActor* Target) const
@@ -122,9 +152,14 @@ AActor* URDAbilityComponent::FindBestGrabTarget() const
 	return BestTarget;
 }
 
+void URDAbilityComponent::ClearCurrentGrabTarget()
+{
+	CurrentGrabTarget = nullptr;
+}
+
 bool URDAbilityComponent::TryStartGrab()
 {
-	if (!GrabAbilityClass)
+	if (!GrabAbilityClass || !CanEnterGrab())
 	{
 		CurrentGrabTarget = nullptr;
 		return false;
@@ -138,5 +173,11 @@ bool URDAbilityComponent::TryStartGrab()
 	}
 
 	CurrentGrabTarget = Target;
-	return TryActivateAbilityByClass(GrabAbilityClass);
+	if (!TryActivateAbilityByClass(GrabAbilityClass))
+	{
+		CurrentGrabTarget = nullptr;
+		return false;
+	}
+
+	return SetSkillState(ERDSkillFlowState::GrabAim);
 }

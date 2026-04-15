@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "AbilitySystemComponent.h"
+#include "GAS/RDAbilityStateMachine.h"
 #include "RDAbilityComponent.generated.h"
 
 class AActor;
@@ -21,6 +22,27 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Grab")
 	bool TryStartGrab();
 
+	UFUNCTION(BlueprintPure, Category="StateMachine")
+	ERDAbilityMainState GetMainState() const { return StateMachine.GetMainState(); }
+
+	UFUNCTION(BlueprintPure, Category="StateMachine")
+	ERDSkillFlowState GetSkillState() const { return StateMachine.GetSkillState(); }
+
+	UFUNCTION(BlueprintCallable, Category="StateMachine")
+	void SetMainState(ERDAbilityMainState NewState);
+
+	UFUNCTION(BlueprintCallable, Category="StateMachine")
+	bool SetSkillState(ERDSkillFlowState NewState);
+
+	UFUNCTION(BlueprintPure, Category="StateMachine")
+	bool CanEnterDash() const;
+
+	UFUNCTION(BlueprintPure, Category="StateMachine")
+	bool CanEnterGrab() const;
+
+	UFUNCTION(BlueprintPure, Category="StateMachine")
+	bool CanTransitSkillState(ERDSkillFlowState FromState, ERDSkillFlowState ToState) const;
+
 	UFUNCTION(BlueprintPure, Category="Grab")
 	bool CanStartGrab(AActor* Target) const;
 
@@ -29,6 +51,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category="Grab")
 	AActor* GetCurrentGrabTarget() const { return CurrentGrabTarget.Get(); }
+
+	UFUNCTION(BlueprintCallable, Category="Grab")
+	void ClearCurrentGrabTarget();
 
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Ability|Dash")
@@ -48,4 +73,7 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Grab")
 	TWeakObjectPtr<AActor> CurrentGrabTarget;
+
+private:
+	FRDAbilityStateMachine StateMachine;
 };
